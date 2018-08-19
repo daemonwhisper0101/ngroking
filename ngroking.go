@@ -19,6 +19,7 @@ type Conn interface {
   Start()
   Stop()
   URL() string
+  LiveTime() time.Duration
   CurrentProxy() string
   Destroy()
 }
@@ -166,6 +167,13 @@ tunnels: {"tunnels":[{"name":"https","uri":"/api/tunnels/https","public_url":"ht
   n.public_url = a1[0]
   n.logger.Printf("public_url: %s\n", n.public_url)
   return n.public_url
+}
+
+func (n *ngrok)LiveTime() time.Duration {
+  if n.process == nil {
+    return 0
+  }
+  return time.Now().Sub(n.start)
 }
 
 func (n *ngrok)CurrentProxy() string {

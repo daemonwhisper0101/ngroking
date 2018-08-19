@@ -10,7 +10,7 @@ import (
   "syscall"
   "time"
 
-  "github.com/daemonwhisper0101/ngroking"
+  "github.com/daemonwhisper0101/ngroking/keeper"
 )
 
 type MyLogger struct {
@@ -37,6 +37,14 @@ func signalhandler(quit chan struct{}) {
   }()
 }
 
+func run(bin, addr string, proxies []string) {
+  logger := log.New(os.Stdout, "", log.LstdFlags)
+  lifetime := time.Minute * 2
+  k := keeper.New(4, lifetime, bin, addr, proxies, logger)
+  k.Start()
+  k.Stop()
+}
+
 func main() {
   if len(os.Args) < 4 {
     os.Exit(1)
@@ -44,47 +52,36 @@ func main() {
   bin := os.Args[1]
   addr := os.Args[2]
   proxies := os.Args[3:]
+  lifetime := time.Minute * 2
   // create 4 connections
-  ngrok := []ngroking.Conn{}
   mylog := &MyLogger{ logs: []string{} }
   logger := log.New(mylog, "", log.LstdFlags)
   //logger = log.New(os.Stdout, "", log.LstdFlags)
-  for i := 0; i < 4; i++ {
-    ngrok = append(ngrok, ngroking.New(bin, addr, proxies, logger))
-  }
+  k := keeper.New(4, lifetime, bin, addr, proxies, logger)
   // catch Ctrl-C
   quit := make(chan struct{})
   signalhandler(quit)
 
+  k.Start()
   // manage
 loop:
   for {
     for i := 0; i < 4; i++ {
-      // restart ngrok
-      ngrok[i].Stop()
-      time.Sleep(time.Second)
-      ngrok[i].Start()
-      for n := 0; n < 5; n++ {
-	if ngrok[i].URL() != "" {
-	  break
+      ngrok := k.GetInstance(i)
+      if ngrok != nil {
+	if ngrok.URL() != "" {
+	  fmt.Printf("%s via %s\n", ngrok.URL(), ngrok.CurrentProxy())
 	}
-	time.Sleep(time.Second)
       }
-      fmt.Printf("%s via %s\n", ngrok[i].URL(), ngrok[i].CurrentProxy())
-      select {
-      case <-quit: break loop
-      //case <-time.After(time.Hour * 2):
-      case <-time.After(time.Second * 30):
-      }
+    }
+    select {
+    case <-quit: break loop
+    case <-time.After(time.Minute):
     }
   }
   fmt.Println("Stopping")
-  for i := 0; i < 4; i++ {
-    ngrok[i].Stop()
-  }
-  for i := 0; i < 4; i++ {
-    ngrok[i].Destroy()
-  }
+  k.Stop()
+  k.Destroy()
   // show logs
   for _, log := range mylog.logs {
     fmt.Println(log)
