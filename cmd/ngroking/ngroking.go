@@ -70,7 +70,7 @@ loop:
 	}
 	time.Sleep(time.Second)
       }
-      fmt.Println(ngrok[i].URL())
+      fmt.Printf("%s via %s\n", ngrok[i].URL(), ngrok[i].CurrentProxy())
       select {
       case <-quit: break loop
       //case <-time.After(time.Hour * 2):

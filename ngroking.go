@@ -19,6 +19,7 @@ type Conn interface {
   Start()
   Stop()
   URL() string
+  CurrentProxy() string
   Destroy()
 }
 
@@ -26,6 +27,7 @@ type ngrok struct {
   bin string
   addr string
   proxies []string
+  curr string
   tmpdir string
   process *os.Process
   wait chan struct{}
@@ -47,6 +49,7 @@ func (n *ngrok)Start() {
 proxyselection:
     for _, proxy := range n.proxies {
       n.logger.Printf("trying proxy %s\n", proxy)
+      n.curr = proxy
       cmd = exec.Command(n.bin, "start", "-config", "config.yml", "https")
       cmd.Dir = n.tmpdir
       cmd.SysProcAttr = &syscall.SysProcAttr{ Setpgid: true }
@@ -127,6 +130,7 @@ func (n *ngrok)Stop() {
   // reset
   n.public_url = ""
   n.webaddr = ""
+  n.curr = ""
   n.process = nil
 }
 
@@ -162,6 +166,13 @@ tunnels: {"tunnels":[{"name":"https","uri":"/api/tunnels/https","public_url":"ht
   n.public_url = a1[0]
   n.logger.Printf("public_url: %s\n", n.public_url)
   return n.public_url
+}
+
+func (n *ngrok)CurrentProxy() string {
+  if n.process == nil {
+    return ""
+  }
+  return n.curr
 }
 
 func (n *ngrok)Destroy() {
