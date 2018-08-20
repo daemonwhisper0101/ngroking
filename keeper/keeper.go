@@ -52,7 +52,12 @@ func (k *keeper)worker() {
 	break
       }
     }
-    timeout := time.After(k.lifetime / 10)
+    nr := time.Duration(len(k.ngrok))
+    interval := k.lifetime / nr
+    if interval < time.Second * 5 {
+      interval = time.Second * 5
+    }
+    timeout := time.After(k.lifetime / nr)
     select {
     case <-k.quit:
     case <-timeout:
